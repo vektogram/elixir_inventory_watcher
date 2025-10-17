@@ -152,10 +152,11 @@ type Product {
 def update_stock(product_id, new_stock_count) do
   # Update database
   # Broadcast to all subscribers
-  Endpoint.broadcast("products:stock_updates", "stock_updated", updated_product)
+  Subscription.publish(Endpoint, updated_product, stock_updated: "products:stock_updates")
 end
 ```
 
+- **Absinthe Subscriptions** re-run subscribed documents automatically
 - **Phoenix PubSub** enables efficient message broadcasting
 - **WebSocket connections** for real-time client updates
 - **Topic-based subscriptions** allow selective listening
@@ -376,6 +377,12 @@ The backend is designed to integrate seamlessly with the React frontend using:
 2. Implement product list component with GraphQL queries
 3. Add subscription handling for real-time updates
 4. Connect React components to live data
+
+## 🧩 Troubleshooting & Recent Fixes
+
+- **Missing socket supervision tree**: Commenting out the `/socket` mount in `InventoryWatcherWeb.Endpoint` prevents Absinthe channels from starting. Restoring the mount (and keeping `InventoryWatcherWeb.UserSocket` using `Absinthe.Phoenix.Socket`) resolves the Phoenix `no socket supervision tree found` crash during subscription handshakes.
+- **PubSub not configured errors**: Absinthe subscriptions require the endpoint to be passed through the socket context, the subscription supervisor (`{Absinthe.Subscription, InventoryWatcherWeb.Endpoint}`) running after the endpoint, and servers publishing via `Absinthe.Subscription.publish/3`. Without those, `Absinthe.Phase.Subscription.SubscribeSelf.ensure_pubsub!/1` raises `Pubsub not configured!`.
+- **CLI websocket probe**: The helper script `test_subscription.exs` uses WebSockex. On macOS the default `localhost` resolution can prefer IPv6, while Bandit listens on IPv4; using the explicit URL `ws://127.0.0.1:4000/socket/websocket` avoids `:econnrefused` when the Phoenix server is already running.
 
 ## 📚 Key Technologies Demonstrated
 
@@ -634,14 +641,14 @@ FILE: test_subscription.exs
 # Run with: elixir test_subscription.exs
 
 Mix.install([
-  {:websocket_client, "~> 1.3"}
+  {:websockex, "~> 0.4"}
 ])
 
 defmodule SubscriptionTest do
   use WebSockex
 
   def start_link do
-    WebSockex.start_link("ws://localhost:4000/socket/websocket", __MODULE__, %{})
+    WebSockex.start_link("ws://127.0.0.1:4000/socket/websocket", __MODULE__, %{})
   end
 
   def handle_connect(_conn, state) do
@@ -698,7 +705,7 @@ IO.puts("In another terminal, run: curl -X POST http://localhost:4000/api/simula
 IO.puts("You should see stock update notifications here.")
 IO.puts("Press Ctrl+C to exit.")
 
-{:ok, pid} = SubscriptionTest.start_link()
+{:ok, _pid} = SubscriptionTest.start_link()
 
 # Keep the script running
 Process.sleep(:infinity)
@@ -1435,7 +1442,8 @@ defmodule InventoryWatcher.Application do
       # Start a worker by calling: InventoryWatcher.Worker.start_link(arg)
       # {InventoryWatcher.Worker, arg},
       # Start to serve requests, typically the last entry
-      InventoryWatcherWeb.Endpoint
+      InventoryWatcherWeb.Endpoint,
+      {Absinthe.Subscription, InventoryWatcherWeb.Endpoint}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
@@ -1495,6 +1503,7 @@ end
 FILE: lib/inventory_watcher/product_service.ex
 ================================================
 defmodule InventoryWatcher.ProductService do
+  alias Absinthe.Subscription
   alias InventoryWatcher.Repo
   alias InventoryWatcher.Product
   alias InventoryWatcherWeb.Endpoint
@@ -1510,7 +1519,10 @@ defmodule InventoryWatcher.ProductService do
         case Repo.update(changeset) do
           {:ok, updated_product} ->
             # Broadcast the update to all subscribers
-            Endpoint.broadcast("products:stock_updates", "stock_updated", updated_product)
+            Subscription.publish(Endpoint, updated_product,
+              stock_updated: "products:stock_updates"
+            )
+
             {:ok, updated_product}
 
           {:error, changeset} ->
@@ -1554,6 +1566,7 @@ FILE: lib/inventory_watcher_web/endpoint.ex
 ================================================
 defmodule InventoryWatcherWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :inventory_watcher
+  use Absinthe.Phoenix.Endpoint
 
   # The session will be stored in the cookie and signed,
   # this means its contents can be read but not tampered with.
@@ -1603,6 +1616,7 @@ defmodule InventoryWatcherWeb.Endpoint do
     origin: ["http://localhost:8080"],
     methods: ["GET", "POST"],
     headers: ["*"]
+
   plug Plug.Parsers,
     parsers: [:urlencoded, :multipart, :json],
     pass: ["*/*"],
@@ -1682,7 +1696,10 @@ defmodule InventoryWatcherWeb.Router do
     forward("/graphql", Absinthe.Plug, schema: InventoryWatcherWeb.Schema)
 
     if Mix.env() == :dev do
-      forward("/graphiql", Absinthe.Plug.GraphiQL, schema: InventoryWatcherWeb.Schema)
+      forward("/graphiql", Absinthe.Plug.GraphiQL,
+        schema: InventoryWatcherWeb.Schema,
+        socket: InventoryWatcherWeb.UserSocket
+      )
     end
   end
 
@@ -1718,6 +1735,10 @@ FILE: lib/inventory_watcher_web/schema.ex
 defmodule InventoryWatcherWeb.Schema do
   use Absinthe.Schema
   import_types(InventoryWatcherWeb.Schema.ProductTypes)
+
+  def context(ctx) do
+    Map.put(ctx, :pubsub, InventoryWatcherWeb.Endpoint)
+  end
 
   query do
     @desc "Get all products"
@@ -1851,6 +1872,12 @@ defmodule InventoryWatcherWeb.UserSocket do
   @impl true
   def connect(_params, socket, _connect_info) do
     IO.puts("✅ UserSocket connecting...")
+
+    socket =
+      Absinthe.Phoenix.Socket.put_options(socket,
+        context: %{pubsub: InventoryWatcherWeb.Endpoint}
+      )
+
     {:ok, socket}
   end
 
