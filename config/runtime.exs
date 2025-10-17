@@ -58,6 +58,12 @@ if config_env() == :prod do
        "https://example.com")
     |> String.split(",", trim: true)
 
+  cors_origins =
+    (System.get_env("FRONTEND_ORIGINS") ||
+       System.get_env("FRONTEND_URL") ||
+       "https://example.com")
+    |> String.split(",", trim: true)
+
   config :inventory_watcher, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
   config :inventory_watcher, InventoryWatcherWeb.Endpoint,
@@ -73,6 +79,14 @@ if config_env() == :prod do
     secret_key_base: secret_key_base,
     check_origin: allowed_origins,
     force_ssl: [rewrite_on: [:x_forwarded_proto]]
+
+  config :cors_plug,
+    origin: cors_origins,
+    max_age: 86_400,
+    methods: ["GET", "POST", "OPTIONS"],
+    headers: ["*"],
+    expose: ["content-type"],
+    credentials: true
 
   # ## SSL Support
   #
