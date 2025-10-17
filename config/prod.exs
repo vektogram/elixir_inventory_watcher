@@ -27,7 +27,10 @@ cors_origins =
 config :cors_plug,
   origin: cors_origins,
   max_age: 86_400,
-  methods: ["GET", "POST", "OPTIONS"]
+  methods: ["GET", "POST", "OPTIONS"],
+  headers: ["*"],
+  expose: ["content-type"],
+  credentials: true
 
 # Runtime production configuration, including reading
 # of environment variables, is done on config/runtime.exs.
