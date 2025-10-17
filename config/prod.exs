@@ -18,8 +18,16 @@ config :swoosh, local: false
 config :logger, level: :info
 
 # CORS for frontend (allow your frontend domain)
+cors_origins =
+  (System.get_env("FRONTEND_ORIGINS") ||
+     System.get_env("FRONTEND_URL") ||
+     "https://your-frontend-domain.com")
+  |> String.split(",", trim: true)
+
 config :cors_plug,
-  origin: [System.get_env("FRONTEND_URL") || "https://your-frontend-domain.com"]
+  origin: cors_origins,
+  max_age: 86_400,
+  methods: ["GET", "POST", "OPTIONS"]
 
 # Runtime production configuration, including reading
 # of environment variables, is done on config/runtime.exs.

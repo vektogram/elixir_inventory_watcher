@@ -51,6 +51,13 @@ if config_env() == :prod do
   host = System.get_env("PHX_HOST") || "example.com"
   port = String.to_integer(System.get_env("PORT") || "4000")
 
+  allowed_origins =
+    (System.get_env("CHECK_ORIGIN") ||
+       System.get_env("FRONTEND_ORIGINS") ||
+       System.get_env("FRONTEND_URL") ||
+       "https://example.com")
+    |> String.split(",", trim: true)
+
   config :inventory_watcher, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
   config :inventory_watcher, InventoryWatcherWeb.Endpoint,
@@ -63,7 +70,9 @@ if config_env() == :prod do
       ip: {0, 0, 0, 0, 0, 0, 0, 0},
       port: port
     ],
-    secret_key_base: secret_key_base
+    secret_key_base: secret_key_base,
+    check_origin: allowed_origins,
+    force_ssl: [rewrite_on: [:x_forwarded_proto]]
 
   # ## SSL Support
   #
