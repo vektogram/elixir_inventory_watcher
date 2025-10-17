@@ -17,7 +17,8 @@ defmodule InventoryWatcher.Application do
       # Start a worker by calling: InventoryWatcher.Worker.start_link(arg)
       # {InventoryWatcher.Worker, arg},
       # Start to serve requests, typically the last entry
-      InventoryWatcherWeb.Endpoint
+      InventoryWatcherWeb.Endpoint,
+      {Absinthe.Subscription, InventoryWatcherWeb.Endpoint}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

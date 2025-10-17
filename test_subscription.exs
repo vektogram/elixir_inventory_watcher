@@ -4,7 +4,7 @@
 # Run with: elixir test_subscription.exs
 
 Mix.install([
-  {:websocket_client, "~> 1.3"}
+  {:websockex, "~> 0.4"}
 ])
 
 defmodule SubscriptionTest do

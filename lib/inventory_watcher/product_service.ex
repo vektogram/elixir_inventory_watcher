@@ -1,4 +1,5 @@
 defmodule InventoryWatcher.ProductService do
+  alias Absinthe.Subscription
   alias InventoryWatcher.Repo
   alias InventoryWatcher.Product
   alias InventoryWatcherWeb.Endpoint
@@ -14,7 +15,7 @@ defmodule InventoryWatcher.ProductService do
         case Repo.update(changeset) do
           {:ok, updated_product} ->
             # Broadcast the update to all subscribers
-            Endpoint.broadcast("products:stock_updates", "stock_updated", updated_product)
+            Subscription.publish(Endpoint, updated_product, stock_updated: "products:stock_updates")
             {:ok, updated_product}
 
           {:error, changeset} ->

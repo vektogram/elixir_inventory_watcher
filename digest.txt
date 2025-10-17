@@ -1654,44 +1654,43 @@ defmodule InventoryWatcherWeb.Router do
   use InventoryWatcherWeb, :router
 
   pipeline :browser do
-    plug :accepts, ["html"]
-    plug :fetch_session
-    plug :fetch_live_flash
-    plug :put_root_layout, html: {InventoryWatcherWeb.Layouts, :root}
-    plug :protect_from_forgery
-    plug :put_secure_browser_headers
+    plug(:accepts, ["html"])
+    plug(:fetch_session)
+    plug(:fetch_live_flash)
+    plug(:put_root_layout, html: {InventoryWatcherWeb.Layouts, :root})
+    plug(:protect_from_forgery)
+    plug(:put_secure_browser_headers)
   end
 
   pipeline :api do
-    plug :accepts, ["json"]
+    plug(:accepts, ["json"])
   end
 
   pipeline :graphql do
-    plug :accepts, ["json"]
+    plug(:accepts, ["json"])
   end
 
   scope "/", InventoryWatcherWeb do
-    pipe_through :browser
+    pipe_through(:browser)
 
-    get "/", PageController, :home
+    get("/", PageController, :home)
   end
 
   scope "/api" do
-    pipe_through :graphql
+    pipe_through(:graphql)
 
-    forward "/graphql", Absinthe.Plug, schema: InventoryWatcherWeb.Schema
+    forward("/graphql", Absinthe.Plug, schema: InventoryWatcherWeb.Schema)
 
     if Mix.env() == :dev do
-      forward "/graphiql", Absinthe.Plug.GraphiQL, schema: InventoryWatcherWeb.Schema
+      forward("/graphiql", Absinthe.Plug.GraphiQL, schema: InventoryWatcherWeb.Schema)
     end
   end
 
   scope "/api", InventoryWatcherWeb do
-    pipe_through :api
+    pipe_through(:api)
 
-    post "/simulate-stock-update", PageController, :simulate_stock_update
+    post("/simulate-stock-update", PageController, :simulate_stock_update)
   end
-
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:inventory_watcher, :dev_routes) do
@@ -1703,10 +1702,10 @@ defmodule InventoryWatcherWeb.Router do
     import Phoenix.LiveDashboard.Router
 
     scope "/dev" do
-      pipe_through :browser
+      pipe_through(:browser)
 
-      live_dashboard "/dashboard", metrics: InventoryWatcherWeb.Telemetry
-      forward "/mailbox", Plug.Swoosh.MailboxPreview
+      live_dashboard("/dashboard", metrics: InventoryWatcherWeb.Telemetry)
+      forward("/mailbox", Plug.Swoosh.MailboxPreview)
     end
   end
 end
@@ -1847,39 +1846,14 @@ FILE: lib/inventory_watcher_web/channels/user_socket.ex
 ================================================
 defmodule InventoryWatcherWeb.UserSocket do
   use Phoenix.Socket
-
-  # For Absinthe subscriptions
   use Absinthe.Phoenix.Socket, schema: InventoryWatcherWeb.Schema
 
-  ## Channels
-  # channel "room:*", InventoryWatcherWeb.RoomChannel
-
-  # Socket params are passed from the client and can
-  # be used to verify and authenticate a user. After
-  # verification, you can put default assigns into
-  # the socket that will be set for all channels, ie
-  #
-  #     {:ok, assign(socket, :user_id, verified_user_id)}
-  #
-  # To deny connection, return `:error`.
-  #
-  # See `Phoenix.Token` documentation for examples in
-  # performing token verification on connect.
   @impl true
   def connect(_params, socket, _connect_info) do
+    IO.puts("✅ UserSocket connecting...")
     {:ok, socket}
   end
 
-  # Socket id's are topics that allow you to identify all sockets for a given user:
-  #
-  #     def id(socket), do: "user_socket:#{socket.assigns.user_id}"
-  #
-  # Would allow you to broadcast a "disconnect" event and terminate
-  # all active sockets and channels for a given user:
-  #
-  #     InventoryWatcherWeb.Endpoint.broadcast("user_socket:#{user.id}", "disconnect", %{})
-  #
-  # Returning `nil` makes this socket anonymous.
   @impl true
   def id(_socket), do: nil
 end

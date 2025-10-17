@@ -2,6 +2,10 @@ defmodule InventoryWatcherWeb.Schema do
   use Absinthe.Schema
   import_types(InventoryWatcherWeb.Schema.ProductTypes)
 
+  def context(ctx) do
+    Map.put(ctx, :pubsub, InventoryWatcherWeb.Endpoint)
+  end
+
   query do
     @desc "Get all products"
     field :products, list_of(:product) do
