@@ -22,6 +22,11 @@ config :inventory_watcher, InventoryWatcherWeb.Endpoint,
   pubsub_server: InventoryWatcher.PubSub,
   live_view: [signing_salt: "2gAM1/B/"]
 
+# Configure Absinthe to use Phoenix PubSub
+config :absinthe,
+  schema: InventoryWatcherWeb.Schema,
+  pubsub: InventoryWatcher.PubSub
+
 # Configures the mailer
 #
 # By default it uses the "Local" adapter which stores the emails
