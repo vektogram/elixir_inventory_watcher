@@ -14,12 +14,18 @@ defmodule InventoryWatcher.Release do
   def seed do
     load_app()
 
-    seed_script = Path.join([:code.priv_dir(@app), "repo", "seeds.exs"])
+    seed_script = priv_repo_path("seeds.exs")
 
-    for _repo <- repos() do
-      if File.exists?(seed_script) do
-        Code.eval_file(seed_script)
-      end
+    for repo <- repos() do
+      {:ok, _, _} =
+        Ecto.Migrator.with_repo(repo, fn _repo ->
+          if File.exists?(seed_script) do
+            IO.puts("Running seed script for #{inspect(repo)}\n")
+            Code.eval_file(seed_script)
+          else
+            IO.puts("Seed script not found at #{seed_script}, skipping.\n")
+          end
+        end)
     end
   end
 
@@ -29,5 +35,9 @@ defmodule InventoryWatcher.Release do
 
   defp load_app do
     Application.load(@app)
+  end
+
+  defp priv_repo_path(filename) do
+    Path.join([:code.priv_dir(@app), "repo", filename])
   end
 end
