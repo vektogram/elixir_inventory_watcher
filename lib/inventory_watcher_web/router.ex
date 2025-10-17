@@ -40,6 +40,7 @@ defmodule InventoryWatcherWeb.Router do
     post "/simulate-stock-update", PageController, :simulate_stock_update
   end
 
+
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:inventory_watcher, :dev_routes) do
     # If you want to use the LiveDashboard in production, you should put
