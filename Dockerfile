@@ -27,7 +27,7 @@ RUN apk add --no-cache libstdc++ openssl ncurses-libs bash postgresql-client
 
 WORKDIR /app
 COPY --from=builder /app/_build/prod/rel/inventory_watcher ./
-COPY priv/repo/seeds.exs ./  # If needed for initial seed
+COPY --from=builder /app/priv/repo/seeds.exs ./seeds.exs  # If needed for initial seed
 
 # Run migrations on start
 RUN echo '#!/bin/sh\nmix ecto.migrate' > entrypoint.sh && chmod +x entrypoint.sh
