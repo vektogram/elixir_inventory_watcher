@@ -14,16 +14,25 @@ defmodule InventoryWatcherWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :graphql do
+    plug :accepts, ["json"]
+  end
+
   scope "/", InventoryWatcherWeb do
     pipe_through :browser
 
     get "/", PageController, :home
   end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", InventoryWatcherWeb do
-  #   pipe_through :api
-  # end
+  scope "/api" do
+    pipe_through :graphql
+
+    forward "/graphql", Absinthe.Plug, schema: InventoryWatcherWeb.Schema
+
+    if Mix.env() == :dev do
+      forward "/graphiql", Absinthe.Plug.GraphiQL, schema: InventoryWatcherWeb.Schema
+    end
+  end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:inventory_watcher, :dev_routes) do
