@@ -15,7 +15,7 @@ defmodule InventoryWatcherWeb.Endpoint do
     websocket: [connect_info: [session: @session_options]],
     longpoll: [connect_info: [session: @session_options]]
 
-  socket "/socket", Absinthe.Phoenix.Socket,
+  socket "/socket", InventoryWatcherWeb.UserSocket,
     websocket: true,
     longpoll: false
 
