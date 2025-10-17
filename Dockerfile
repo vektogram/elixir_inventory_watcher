@@ -13,7 +13,7 @@ RUN mix deps.get --only prod
 RUN mix deps.compile
 
 # Build assets
-RUN mix assets.deploy
+RUN MIX_ENV=prod mix assets.deploy
 
 # Compile app
 RUN MIX_ENV=prod mix compile
