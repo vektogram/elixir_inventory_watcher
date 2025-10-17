@@ -5,7 +5,12 @@ defmodule InventoryWatcherWeb.UserSocket do
   @impl true
   def connect(_params, socket, _connect_info) do
     IO.puts("✅ UserSocket connecting...")
-    socket = Absinthe.Phoenix.Socket.put_options(socket, context: %{pubsub: InventoryWatcherWeb.Endpoint})
+
+    socket =
+      Absinthe.Phoenix.Socket.put_options(socket,
+        context: %{pubsub: InventoryWatcherWeb.Endpoint}
+      )
+
     {:ok, socket}
   end
 

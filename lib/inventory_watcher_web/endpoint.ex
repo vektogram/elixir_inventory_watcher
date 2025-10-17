@@ -50,6 +50,7 @@ defmodule InventoryWatcherWeb.Endpoint do
     origin: ["http://localhost:8080"],
     methods: ["GET", "POST"],
     headers: ["*"]
+
   plug Plug.Parsers,
     parsers: [:urlencoded, :multipart, :json],
     pass: ["*/*"],

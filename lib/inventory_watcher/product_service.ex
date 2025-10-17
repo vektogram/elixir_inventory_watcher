@@ -15,7 +15,10 @@ defmodule InventoryWatcher.ProductService do
         case Repo.update(changeset) do
           {:ok, updated_product} ->
             # Broadcast the update to all subscribers
-            Subscription.publish(Endpoint, updated_product, stock_updated: "products:stock_updates")
+            Subscription.publish(Endpoint, updated_product,
+              stock_updated: "products:stock_updates"
+            )
+
             {:ok, updated_product}
 
           {:error, changeset} ->

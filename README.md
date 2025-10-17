@@ -70,10 +70,11 @@ type Product {
 def update_stock(product_id, new_stock_count) do
   # Update database
   # Broadcast to all subscribers
-  Endpoint.broadcast("products:stock_updates", "stock_updated", updated_product)
+  Subscription.publish(Endpoint, updated_product, stock_updated: "products:stock_updates")
 end
 ```
 
+- **Absinthe Subscriptions** re-run subscribed documents automatically
 - **Phoenix PubSub** enables efficient message broadcasting
 - **WebSocket connections** for real-time client updates
 - **Topic-based subscriptions** allow selective listening
@@ -294,6 +295,12 @@ The backend is designed to integrate seamlessly with the React frontend using:
 2. Implement product list component with GraphQL queries
 3. Add subscription handling for real-time updates
 4. Connect React components to live data
+
+## 🧩 Troubleshooting & Recent Fixes
+
+- **Missing socket supervision tree**: Commenting out the `/socket` mount in `InventoryWatcherWeb.Endpoint` prevents Absinthe channels from starting. Restoring the mount (and keeping `InventoryWatcherWeb.UserSocket` using `Absinthe.Phoenix.Socket`) resolves the Phoenix `no socket supervision tree found` crash during subscription handshakes.
+- **PubSub not configured errors**: Absinthe subscriptions require the endpoint to be passed through the socket context, the subscription supervisor (`{Absinthe.Subscription, InventoryWatcherWeb.Endpoint}`) running after the endpoint, and servers publishing via `Absinthe.Subscription.publish/3`. Without those, `Absinthe.Phase.Subscription.SubscribeSelf.ensure_pubsub!/1` raises `Pubsub not configured!`.
+- **CLI websocket probe**: The helper script `test_subscription.exs` uses WebSockex. On macOS the default `localhost` resolution can prefer IPv6, while Bandit listens on IPv4; using the explicit URL `ws://127.0.0.1:4000/socket/websocket` avoids `:econnrefused` when the Phoenix server is already running.
 
 ## 📚 Key Technologies Demonstrated
 

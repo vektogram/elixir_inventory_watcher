@@ -11,7 +11,7 @@ defmodule SubscriptionTest do
   use WebSockex
 
   def start_link do
-    WebSockex.start_link("ws://localhost:4000/socket/websocket", __MODULE__, %{})
+    WebSockex.start_link("ws://127.0.0.1:4000/socket/websocket", __MODULE__, %{})
   end
 
   def handle_connect(_conn, state) do
@@ -68,7 +68,7 @@ IO.puts("In another terminal, run: curl -X POST http://localhost:4000/api/simula
 IO.puts("You should see stock update notifications here.")
 IO.puts("Press Ctrl+C to exit.")
 
-{:ok, pid} = SubscriptionTest.start_link()
+{:ok, _pid} = SubscriptionTest.start_link()
 
 # Keep the script running
 Process.sleep(:infinity)
