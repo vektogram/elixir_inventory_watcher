@@ -1,6 +1,8 @@
 Directory structure:
 └── inventory_watcher/
     ├── README.md
+    ├── Dockerfile
+    ├── dummy.env.yml
     ├── mix.exs
     ├── mix.lock
     ├── test_broadcast.exs
@@ -27,6 +29,7 @@ Directory structure:
     │   │   ├── mailer.ex
     │   │   ├── product.ex
     │   │   ├── product_service.ex
+    │   │   ├── release.ex
     │   │   └── repo.ex
     │   └── inventory_watcher_web/
     │       ├── endpoint.ex
@@ -447,6 +450,63 @@ The backend provides a complete API surface for React frontend integration:
 
 The backend is interview-ready and demonstrates advanced Elixir/Phoenix patterns for real-time web applications.
 
+
+
+================================================
+FILE: Dockerfile
+================================================
+# Backend/Dockerfile
+FROM elixir:1.15-alpine AS builder
+
+# Install build deps
+RUN apk add --no-cache build-base git nodejs npm postgresql-dev
+
+WORKDIR /app
+COPY . .
+
+# Get deps and compile
+RUN mix local.hex --force && mix local.rebar --force
+RUN mix deps.get --only prod
+RUN mix deps.compile
+
+# Build assets
+RUN MIX_ENV=prod mix assets.deploy
+
+# Compile app
+RUN MIX_ENV=prod mix compile
+
+# Create release
+RUN MIX_ENV=prod mix release
+
+# Production stage
+FROM alpine:3.18
+RUN apk add --no-cache libstdc++ openssl ncurses-libs bash postgresql-client
+
+WORKDIR /app
+COPY --from=builder /app/_build/prod/rel/inventory_watcher ./
+
+# Run migrations on start using the release binary
+RUN printf '#!/bin/sh\n/app/bin/inventory_watcher eval "InventoryWatcher.Release.migrate()"\nexec "$@"\n' > entrypoint.sh && chmod +x entrypoint.sh
+
+EXPOSE 4000
+ENTRYPOINT ["./entrypoint.sh"]
+CMD ["bin/inventory_watcher", "start"]
+
+
+================================================
+FILE: dummy.env.yml
+================================================
+# Environment variables for Dokploy deployment
+# Copy these into your Dokploy service environment variables section
+# Replace dummy values with actual ones
+
+DATABASE_URL: postgres://postgres:dummy_password@inventory-db:5432/inventory_watcher_prod
+SECRET_KEY_BASE: dummy_secret_key_base_replace_with_mix_phx_gen_secret_output
+MIX_ENV: prod
+PHX_HOST: your-backend-domain.com
+FRONTEND_URL: https://your-frontend-domain.com
+POOL_SIZE: 10
+PHX_SERVER: true
 
 
 ================================================
@@ -1112,6 +1172,8 @@ config :swoosh, local: false
 # Do not print debug messages in production
 config :logger, level: :info
 
+# CORS for frontend is configured at runtime via config/runtime.exs
+
 # Runtime production configuration, including reading
 # of environment variables, is done on config/runtime.exs.
 
@@ -1173,6 +1235,19 @@ if config_env() == :prod do
   host = System.get_env("PHX_HOST") || "example.com"
   port = String.to_integer(System.get_env("PORT") || "4000")
 
+  allowed_origins =
+    (System.get_env("CHECK_ORIGIN") ||
+       System.get_env("FRONTEND_ORIGINS") ||
+       System.get_env("FRONTEND_URL") ||
+       "https://example.com")
+    |> String.split(",", trim: true)
+
+  cors_origins =
+    (System.get_env("FRONTEND_ORIGINS") ||
+       System.get_env("FRONTEND_URL") ||
+       "https://example.com")
+    |> String.split(",", trim: true)
+
   config :inventory_watcher, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
   config :inventory_watcher, InventoryWatcherWeb.Endpoint,
@@ -1185,7 +1260,17 @@ if config_env() == :prod do
       ip: {0, 0, 0, 0, 0, 0, 0, 0},
       port: port
     ],
-    secret_key_base: secret_key_base
+    secret_key_base: secret_key_base,
+    check_origin: allowed_origins,
+    force_ssl: [rewrite_on: [:x_forwarded_proto]]
+
+  config :cors_plug,
+    origin: cors_origins,
+    max_age: 86_400,
+    methods: ["GET", "POST", "OPTIONS"],
+    headers: ["*"],
+    expose: ["content-type"],
+    credentials: true
 
   # ## SSL Support
   #
@@ -1551,6 +1636,55 @@ end
 
 
 ================================================
+FILE: lib/inventory_watcher/release.ex
+================================================
+defmodule InventoryWatcher.Release do
+  @moduledoc false
+
+  @app :inventory_watcher
+
+  def migrate do
+    load_app()
+
+    for repo <- repos() do
+      {:ok, _, _} = Ecto.Migrator.with_repo(repo, &Ecto.Migrator.run(&1, :up, all: true))
+    end
+  end
+
+  def seed do
+    load_app()
+
+    seed_script = priv_repo_path("seeds.exs")
+
+    for repo <- repos() do
+      {:ok, _, _} =
+        Ecto.Migrator.with_repo(repo, fn _repo ->
+          if File.exists?(seed_script) do
+            IO.puts("Running seed script for #{inspect(repo)}\n")
+            Code.eval_file(seed_script)
+          else
+            IO.puts("Seed script not found at #{seed_script}, skipping.\n")
+          end
+        end)
+    end
+  end
+
+  defp repos do
+    Application.fetch_env!(@app, :ecto_repos)
+  end
+
+  defp load_app do
+    Application.load(@app)
+  end
+
+  defp priv_repo_path(filename) do
+    Path.join([:code.priv_dir(@app), "repo", filename])
+  end
+end
+
+
+
+================================================
 FILE: lib/inventory_watcher/repo.ex
 ================================================
 defmodule InventoryWatcher.Repo do
@@ -1612,10 +1746,7 @@ defmodule InventoryWatcherWeb.Endpoint do
   plug Plug.RequestId
   plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]
 
-  plug CORSPlug,
-    origin: ["http://localhost:8080"],
-    methods: ["GET", "POST"],
-    headers: ["*"]
+  plug CORSPlug
 
   plug Plug.Parsers,
     parsers: [:urlencoded, :multipart, :json],
