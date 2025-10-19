@@ -43,6 +43,20 @@ defmodule InventoryWatcher.ProductService do
     end
   end
 
+  def reset_stock_levels do
+    Repo.transaction(fn ->
+      for product <- Repo.all(Product) do
+        case initial_stock_for_sku(product.sku) do
+          nil ->
+            :ok
+
+          initial ->
+            {:ok, _} = update_stock(product.id, initial)
+        end
+      end
+    end)
+  end
+
   defp next_stock_level(0), do: Enum.random(10..30)
 
   defp next_stock_level(current) when current <= @low_stock_threshold do
@@ -84,4 +98,14 @@ defmodule InventoryWatcher.ProductService do
     addition = Enum.random(range)
     min(current + addition, @max_stock)
   end
+
+  defp initial_stock_for_sku("WBH-001"), do: 25
+  defp initial_stock_for_sku("MGK-002"), do: 12
+  defp initial_stock_for_sku("4KUHD-003"), do: 8
+  defp initial_stock_for_sku("WCP-004"), do: 45
+  defp initial_stock_for_sku("USBC-005"), do: 30
+  defp initial_stock_for_sku("EOC-006"), do: 5
+  defp initial_stock_for_sku("SHSC-007"), do: 18
+  defp initial_stock_for_sku("PSSDD-008"), do: 22
+  defp initial_stock_for_sku(_sku), do: nil
 end
